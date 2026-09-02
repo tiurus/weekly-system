@@ -39,11 +39,17 @@ export async function loginAction(
   if (isLoginBlocked(key))
     return { error: "Слишком много попыток. Попробуйте позже" };
 
-  const owner = await ensureConfiguredOwner();
-  const passwordMatches = await argon2.verify(
-    owner.passwordHash,
-    parsed.data.password,
-  );
+  let owner: Awaited<ReturnType<typeof ensureConfiguredOwner>>;
+  let passwordMatches = false;
+  try {
+    owner = await ensureConfiguredOwner();
+    passwordMatches = await argon2.verify(
+      owner.passwordHash,
+      parsed.data.password,
+    );
+  } catch {
+    return { error: "Не удалось войти. Попробуйте ещё раз" };
+  }
   const usernameMatches = owner.username === parsed.data.username;
 
   if (!passwordMatches || !usernameMatches) {

@@ -103,3 +103,61 @@ export async function savePrimaryFocus(input: { value: string }) {
   revalidatePath("/today");
   return { ok: true as const };
 }
+
+export async function saveEveningNote(input: { value: string }) {
+  const value = z.string().trim().max(500).parse(input.value);
+  const { user, date } = await mutationContext();
+  await db.dailyLog.update({
+    where: { userId_localDate: { userId: user.id, localDate: date } },
+    data: { eveningNote: value || null },
+  });
+  revalidatePath("/today");
+  return { ok: true as const };
+}
+
+export async function addActivitySession(input: {
+  targetId: string;
+  idempotencyKey: string;
+}) {
+  const parsed = z
+    .object({ targetId: z.uuid(), idempotencyKey: z.uuid() })
+    .parse(input);
+  const { user, date, week } = await mutationContext();
+  const target = await db.weeklyTarget.findFirst({
+    where: { id: parsed.targetId, userId: user.id, weekId: week.id },
+    select: { id: true },
+  });
+  if (!target) throw new Error("Weekly target not found");
+
+  const dailyLog = await db.dailyLog.findUnique({
+    where: { userId_localDate: { userId: user.id, localDate: date } },
+    select: { id: true },
+  });
+  const session = await db.activitySession.upsert({
+    where: { idempotencyKey: parsed.idempotencyKey },
+    create: {
+      userId: user.id,
+      targetId: target.id,
+      dailyLogId: dailyLog?.id,
+      idempotencyKey: parsed.idempotencyKey,
+    },
+    update: {},
+    select: { id: true, userId: true, targetId: true },
+  });
+  if (session.userId !== user.id || session.targetId !== target.id) {
+    throw new Error("Idempotency key collision");
+  }
+
+  revalidatePath("/today");
+  return { ok: true as const, sessionId: session.id };
+}
+
+export async function undoActivitySession(input: { sessionId: string }) {
+  const sessionId = z.uuid().parse(input.sessionId);
+  const { user } = await mutationContext();
+  await db.activitySession.deleteMany({
+    where: { id: sessionId, userId: user.id },
+  });
+  revalidatePath("/today");
+  return { ok: true as const };
+}

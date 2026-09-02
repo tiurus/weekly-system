@@ -1,11 +1,6 @@
-import {
-  CalendarDays,
-  CircleDot,
-  History,
-  LogOut,
-  Settings,
-} from "lucide-react";
+import { LogOut } from "lucide-react";
 import { logoutAction } from "@/app/(app)/actions";
+import { NavLinks } from "@/components/nav-links";
 
 export function AppShell({
   username,
@@ -23,32 +18,7 @@ export function AppShell({
           <span className="brand-mark">W</span>
           <span>Weekly System</span>
         </div>
-        <nav className="nav" aria-label="Основная навигация">
-          <a className="nav-item active" href="/today">
-            <span className="nav-icon">
-              <CircleDot size={14} />
-            </span>
-            <span>Сегодня</span>
-          </a>
-          <a className="nav-item" href="/week">
-            <span className="nav-icon">
-              <CalendarDays size={14} />
-            </span>
-            <span>Неделя</span>
-          </a>
-          <a className="nav-item" href="/history">
-            <span className="nav-icon">
-              <History size={14} />
-            </span>
-            <span>История</span>
-          </a>
-          <a className="nav-item" href="/settings">
-            <span className="nav-icon">
-              <Settings size={14} />
-            </span>
-            <span>Настройки</span>
-          </a>
-        </nav>
+        <NavLinks />
         <div className="sidebar-bottom">
           <div className="sidebar-note">
             <strong>Главное правило</strong>Успех — выполнить план выбранного

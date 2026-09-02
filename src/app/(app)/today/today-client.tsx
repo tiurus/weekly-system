@@ -1,14 +1,17 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Check, LoaderCircle } from "lucide-react";
+import { Check, LoaderCircle, Minus, Plus } from "lucide-react";
 import type { AnchorSlotKey, ModeKey } from "@/lib/modes";
 import { modeContent, modeOrder } from "@/lib/modes";
 import {
+  addActivitySession,
   saveCheckIn,
+  saveEveningNote,
   savePrimaryFocus,
   selectMode,
   toggleAnchor,
+  undoActivitySession,
 } from "./actions";
 
 type DayState = {
@@ -21,7 +24,13 @@ type Anchor = {
   label: string;
   done: boolean;
 };
-type Target = { id: string; name: string; target: number; actual: number };
+type Target = {
+  id: string;
+  name: string;
+  target: number;
+  actual: number;
+  lastSessionId: string | null;
+};
 
 type Props = {
   dateLabel: string;
@@ -31,6 +40,7 @@ type Props = {
   selectedMode: ModeKey | null;
   manuallySelected: boolean;
   primaryFocus: string;
+  eveningNote: string;
   anchorLabels: Record<ModeKey, Record<AnchorSlotKey, string>>;
   anchorDone: Record<AnchorSlotKey, boolean>;
   weekDays: DayState[];
@@ -54,7 +64,9 @@ export function TodayClient(props: Props) {
     props.manuallySelected,
   );
   const [primaryFocus, setPrimaryFocus] = useState(props.primaryFocus);
+  const [eveningNote, setEveningNote] = useState(props.eveningNote);
   const [anchorDone, setAnchorDone] = useState(props.anchorDone);
+  const [targets, setTargets] = useState(props.targets);
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">(
     "idle",
   );
@@ -188,6 +200,84 @@ export function TodayClient(props: Props) {
         await savePrimaryFocus({ value: primaryFocus });
         setStatus("saved");
       } catch {
+        setStatus("error");
+      }
+    });
+  };
+
+  const persistEveningNote = () => {
+    if (!selectedMode) return;
+    setStatus("saving");
+    startTransition(async () => {
+      try {
+        await saveEveningNote({ value: eveningNote });
+        setStatus("saved");
+      } catch {
+        setStatus("error");
+      }
+    });
+  };
+
+  const addSession = (targetId: string) => {
+    const idempotencyKey = crypto.randomUUID();
+    setTargets((current) =>
+      current.map((target) =>
+        target.id === targetId
+          ? { ...target, actual: target.actual + 1 }
+          : target,
+      ),
+    );
+    setStatus("saving");
+    startTransition(async () => {
+      try {
+        const result = await addActivitySession({ targetId, idempotencyKey });
+        setTargets((current) =>
+          current.map((target) =>
+            target.id === targetId
+              ? { ...target, lastSessionId: result.sessionId }
+              : target,
+          ),
+        );
+        setStatus("saved");
+      } catch {
+        setTargets((current) =>
+          current.map((target) =>
+            target.id === targetId
+              ? { ...target, actual: Math.max(0, target.actual - 1) }
+              : target,
+          ),
+        );
+        setStatus("error");
+      }
+    });
+  };
+
+  const undoSession = (targetId: string, sessionId: string) => {
+    const previous = targets.find((target) => target.id === targetId);
+    setTargets((current) =>
+      current.map((target) =>
+        target.id === targetId
+          ? {
+              ...target,
+              actual: Math.max(0, target.actual - 1),
+              lastSessionId: null,
+            }
+          : target,
+      ),
+    );
+    setStatus("saving");
+    startTransition(async () => {
+      try {
+        await undoActivitySession({ sessionId });
+        setStatus("saved");
+      } catch {
+        if (previous) {
+          setTargets((current) =>
+            current.map((target) =>
+              target.id === targetId ? previous : target,
+            ),
+          );
+        }
         setStatus("error");
       }
     });
@@ -366,6 +456,29 @@ export function TodayClient(props: Props) {
               </div>
             )}
           </section>
+
+          {selectedMode ? (
+            <section
+              className="card evening-card"
+              aria-labelledby="evening-title"
+            >
+              <div>
+                <p className="section-kicker">Вечерний итог</p>
+                <h2 id="evening-title">Что повлияло на день?</h2>
+                <p className="small-copy">
+                  Необязательно. Одной короткой мысли достаточно.
+                </p>
+              </div>
+              <textarea
+                value={eveningNote}
+                onChange={(event) => setEveningNote(event.target.value)}
+                onBlur={persistEveningNote}
+                placeholder="Например: помог ранний старт без сообщений"
+                maxLength={500}
+                rows={3}
+              />
+            </section>
+          ) : null}
         </div>
 
         <aside className="side-stack">
@@ -389,17 +502,38 @@ export function TodayClient(props: Props) {
             </div>
           </section>
 
-          {props.targets.length ? (
+          {targets.length ? (
             <section className="card targets-card">
               <p className="section-kicker">Недельные цели</p>
               <h2>Сессии, не серии</h2>
               <div className="target-list">
-                {props.targets.map((target) => (
+                {targets.map((target) => (
                   <div className="target-row" key={target.id}>
-                    <span>{target.name}</span>
+                    <span className="target-name">{target.name}</span>
                     <strong>
                       {target.actual} / {target.target}
                     </strong>
+                    <span className="target-actions">
+                      {target.lastSessionId ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            undoSession(target.id, target.lastSessionId!)
+                          }
+                          aria-label={`Отменить последнюю сессию: ${target.name}`}
+                          title="Отменить последнюю сессию"
+                        >
+                          <Minus size={14} />
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={() => addSession(target.id)}
+                        aria-label={`Добавить сессию: ${target.name}`}
+                      >
+                        <Plus size={14} />
+                      </button>
+                    </span>
                   </div>
                 ))}
               </div>

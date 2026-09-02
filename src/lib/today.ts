@@ -18,7 +18,12 @@ export async function getTodayContext(userId: string, timeZone: string) {
       targets: {
         orderBy: { position: "asc" },
         take: 3,
-        include: { sessions: { select: { id: true } } },
+        include: {
+          sessions: {
+            select: { id: true, createdAt: true },
+            orderBy: { createdAt: "desc" },
+          },
+        },
       },
     },
   });

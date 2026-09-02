@@ -49,12 +49,10 @@ const hash = await argon2.hash(password, {
   timeCost: 3,
   parallelism: 1,
 });
-const escapedHash = hash.replaceAll("$", "\\$");
-
 const current = await readFile(envPath, "utf8");
 const next = current.replace(
   /^APP_PASSWORD_HASH=.*$/m,
-  `APP_PASSWORD_HASH='${escapedHash}'`,
+  `APP_PASSWORD_HASH=${hash}`,
 );
 
 if (next === current) {

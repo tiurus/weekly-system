@@ -62,6 +62,7 @@ export default async function TodayPage() {
       selectedMode={(context.dailyLog?.selectedMode as ModeKey | null) ?? null}
       manuallySelected={context.dailyLog?.modeManuallySelected ?? false}
       primaryFocus={context.dailyLog?.primaryFocus ?? ""}
+      eveningNote={context.dailyLog?.eveningNote ?? ""}
       anchorLabels={anchorLabels}
       anchorDone={{
         FOCUS: context.dailyLog?.focusDone ?? false,
@@ -80,6 +81,7 @@ export default async function TodayPage() {
         name: target.name,
         target: target.targetSessions,
         actual: target.sessions.length,
+        lastSessionId: target.sessions[0]?.id ?? null,
       }))}
     />
   );
