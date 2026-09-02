@@ -1,6 +1,6 @@
 # Развёртывание Weekly System через Nginx Proxy Manager
 
-Документ описывает целевую production-схему. Конкретные Dockerfile, Compose-файл и Prisma-команды будут добавлены вместе с приложением в задаче `WS-605`.
+Документ описывает production-схему, реализованную файлами `Dockerfile`, `compose.yaml` и `.env.production.example`.
 
 ## 1. Целевая схема
 
@@ -56,7 +56,7 @@ docker network create weekly-proxy
 
 ## 4. Целевой Compose-файл приложения
 
-Файл ниже является контрактом для `WS-605`; имена образов и команды миграции уточняются после scaffold.
+Этот же контракт сохранён в корневом файле `compose.yaml`.
 
 ```yaml
 services:
@@ -137,7 +137,7 @@ SESSION_TTL_DAYS=30
 - `APP_USERNAME` не является секретом, но не должен попадать в клиентскую конфигурацию без необходимости;
 - `APP_PASSWORD_HASH` хранит Argon2id-хэш, а не открытый пароль; одинарные кавычки защищают символы `$` от интерполяции env-файла;
 - открытый пароль не передаётся аргументом shell-команды и не сохраняется в истории терминала;
-- приложение предоставляет интерактивную команду `pnpm auth:hash-password`, которая запрашивает пароль без отображения ввода;
+- приложение предоставляет интерактивную команду `ENV_FILE=.env.production pnpm auth:hash-password`, которая запрашивает пароль без отображения ввода;
 - секреты не выводятся командами диагностики и CI.
 
 ## 6. Первый запуск
@@ -148,7 +148,7 @@ SESSION_TTL_DAYS=30
 cd /opt/weekly-system
 docker compose build --pull
 docker compose up -d db
-docker compose run --rm app pnpm prisma migrate deploy
+docker compose run --rm app pnpm db:deploy
 docker compose up -d app
 docker compose ps
 ```
@@ -197,7 +197,7 @@ VPN, IP allowlist и Nginx Basic Auth для доступа к Weekly System н�
 - ошибочные попытки входа ограничиваются по IP и логину;
 - ответ при неправильном логине и пароле одинаков: `Неверный логин или пароль`.
 
-Для смены пароля нужно сгенерировать новый Argon2id-хэш интерактивной командой проекта, обновить `APP_PASSWORD_HASH`, пересоздать контейнер приложения и отозвать существующие сессии.
+Для смены пароля нужно сгенерировать новый Argon2id-хэш командой `ENV_FILE=.env.production pnpm auth:hash-password`, пересоздать контейнер приложения и отозвать существующие сессии.
 
 ## 9. TLS
 
@@ -232,7 +232,7 @@ docker compose exec -T db sh -c \
   'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' \
   > "backup-before-deploy.dump"
 docker compose build --pull app
-docker compose run --rm app pnpm prisma migrate deploy
+docker compose run --rm app pnpm db:deploy
 docker compose up -d app
 docker compose ps
 ```

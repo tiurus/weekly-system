@@ -1,0 +1,9 @@
+.next
+.agents
+.claude
+.windsurf
+src/generated
+node_modules
+coverage
+backups
+pnpm-lock.yaml

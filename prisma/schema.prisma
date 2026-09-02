@@ -1,0 +1,173 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Mode {
+  MINIMUM
+  NORMAL
+  RESOURCE
+}
+
+enum WeekStatus {
+  ACTIVE
+  COMPLETED
+}
+
+enum AnchorSlot {
+  FOCUS
+  BODY
+  SHUTDOWN
+}
+
+enum Background {
+  CALM
+  STRESS
+  ILLNESS
+  TRAVEL
+  OTHER
+}
+
+enum TrackingSemantics {
+  DAY_WITHOUT
+  INCIDENT
+}
+
+model User {
+  id               String                @id @default(uuid()) @db.Uuid
+  username         String                @unique @db.VarChar(64)
+  passwordHash     String
+  timezone         String                @default("Europe/Moscow") @db.VarChar(64)
+  workdayEndTime   String                @default("20:00") @db.VarChar(5)
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  sessions         Session[]
+  weeks            Week[]
+  dailyLogs        DailyLog[]
+  anchorTemplates  DailyAnchorTemplate[]
+  weeklyTargets    WeeklyTarget[]
+  activitySessions ActivitySession[]
+}
+
+model Session {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @db.Uuid
+  tokenHash  String   @unique @db.Char(64)
+  expiresAt  DateTime
+  lastUsedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+}
+
+model Week {
+  id                String         @id @default(uuid()) @db.Uuid
+  userId            String         @db.Uuid
+  startsOn          DateTime       @db.Date
+  endsOn            DateTime       @db.Date
+  status            WeekStatus     @default(ACTIVE)
+  mainOutcome       String?
+  reflectionSupport String?
+  reflectionChange  String?
+  completedAt       DateTime?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dailyLogs         DailyLog[]
+  targets           WeeklyTarget[]
+  constraints       Constraint[]
+
+  @@unique([userId, startsOn])
+  @@index([userId, status])
+}
+
+model DailyLog {
+  id                   String            @id @default(uuid()) @db.Uuid
+  userId               String            @db.Uuid
+  weekId               String?           @db.Uuid
+  localDate            DateTime          @db.Date
+  energy               Int?
+  sleep                Int?
+  background           Background?
+  morningNote          String?
+  suggestedMode        Mode?
+  selectedMode         Mode?
+  modeManuallySelected Boolean           @default(false)
+  primaryFocus         String?
+  focusDone            Boolean           @default(false)
+  bodyDone             Boolean           @default(false)
+  shutdownDone         Boolean           @default(false)
+  eveningNote          String?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+  user                 User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  week                 Week?             @relation(fields: [weekId], references: [id], onDelete: SetNull)
+  activitySessions     ActivitySession[]
+
+  @@unique([userId, localDate])
+  @@index([userId, weekId])
+}
+
+model DailyAnchorTemplate {
+  id        String     @id @default(uuid()) @db.Uuid
+  userId    String     @db.Uuid
+  mode      Mode
+  slot      AnchorSlot
+  label     String
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, mode, slot])
+  @@index([userId, mode])
+}
+
+model WeeklyTarget {
+  id             String            @id @default(uuid()) @db.Uuid
+  userId         String            @db.Uuid
+  weekId         String            @db.Uuid
+  name           String
+  targetSessions Int
+  position       Int
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  week           Week              @relation(fields: [weekId], references: [id], onDelete: Cascade)
+  sessions       ActivitySession[]
+
+  @@unique([weekId, position])
+  @@index([userId, weekId])
+}
+
+model ActivitySession {
+  id             String       @id @default(uuid()) @db.Uuid
+  userId         String       @db.Uuid
+  targetId       String       @db.Uuid
+  dailyLogId     String?      @db.Uuid
+  idempotencyKey String       @unique @db.VarChar(64)
+  occurredAt     DateTime     @default(now())
+  createdAt      DateTime     @default(now())
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  target         WeeklyTarget @relation(fields: [targetId], references: [id], onDelete: Cascade)
+  dailyLog       DailyLog?    @relation(fields: [dailyLogId], references: [id], onDelete: SetNull)
+
+  @@index([userId, targetId])
+}
+
+model Constraint {
+  id        String            @id @default(uuid()) @db.Uuid
+  weekId    String            @db.Uuid
+  label     String
+  semantics TrackingSemantics
+  active    Boolean           @default(true)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  week      Week              @relation(fields: [weekId], references: [id], onDelete: Cascade)
+
+  @@index([weekId, active])
+}
