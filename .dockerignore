@@ -1,4 +1,6 @@
 .git
+.codex
+.agents
 .next
 node_modules
 .env

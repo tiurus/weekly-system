@@ -1,0 +1,4 @@
+# Share a modest parallelism limit; inherit the user's model and permissions.
+[agents]
+enabled = true
+max_concurrent_threads_per_session = 3

@@ -1,0 +1,20 @@
+version = 1
+name = "Weekly System"
+
+[setup]
+script = "node scripts/codex-setup.mjs"
+
+[[actions]]
+name = "Run"
+icon = "run"
+command = "pnpm dev"
+
+[[actions]]
+name = "Check"
+icon = "test"
+command = "pnpm check"
+
+[[actions]]
+name = "Build"
+icon = "tool"
+command = "pnpm build"
